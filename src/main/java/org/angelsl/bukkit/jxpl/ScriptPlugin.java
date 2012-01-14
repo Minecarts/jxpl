@@ -88,11 +88,12 @@ public class ScriptPlugin implements Plugin {
     }
 
     private File initialiseDataFolder() {
-        if (Utils.getOrDefault(rdescription, "jxpl.hasdatafolder", false)) {
+        /*if (Utils.getOrDefault(rdescription, "jxpl.hasdatafolder", false)) {
             File tempFolder = new File(file.getParentFile(), description.getName());
             if(Utils.dirExistOrCreate(tempFolder)) return tempFolder;
         }
-        return null;
+        return null;*/
+        return new File(file.getParentFile(), description.getName());
     }
 
     private YamlConfiguration getDefaultConfig() {
