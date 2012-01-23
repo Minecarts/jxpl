@@ -24,6 +24,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.Event;
+import org.bukkit.event.EventException;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.*;
@@ -120,6 +122,11 @@ public class ScriptPlugin implements Plugin {
     }
 
     @Override
+    public Logger getLogger() {
+        return logger;
+    }
+
+    @Override
     public void setNaggable(boolean canNag) {
         naggable = canNag;
     }
@@ -173,6 +180,24 @@ public class ScriptPlugin implements Plugin {
     }
 
     @Override
+    public void saveDefaultConfig() {
+        if (configFile != null && !configFile.exists()) {
+            YamlConfiguration def = getDefaultConfig();
+            try {
+                if (def != null) def.save(configFile);
+            } catch (IOException e) {
+                log(Level.SEVERE, "Failed to save default configuration file.", e);
+            }
+        }
+    }
+
+    @Override
+    public void saveResource(String resourcePath, boolean replace) {
+        // i have no embedded resources..
+        throw new UnsupportedOperationException("ScriptPlugins do not have embedded resources; not saving resource.");
+    }
+
+    @Override
     public void reloadConfig() {
         config = YamlConfiguration.loadConfiguration(configFile);
         YamlConfiguration defaults = getDefaultConfig();
@@ -200,10 +225,9 @@ public class ScriptPlugin implements Plugin {
     public void onDisable() {
         isEnabled = false;
         tryInvoke("onDisable", false);
-        deregisterListeners();
     }
 
-
+    
     public long getTiming(Event.Type type) {
         return timings[type.ordinal()];
     }
@@ -298,6 +322,12 @@ public class ScriptPlugin implements Plugin {
                 ScriptPlugin.this.tryInvoke(callback, false, type, args);
             }
         }
+        
+        public void onEvent(Event args) {
+            if (ScriptPlugin.this.isEnabled) {
+                ScriptPlugin.this.tryInvoke(callback, false, args);
+            }
+        }
     }
 
     public class PluginHelper {
@@ -309,8 +339,25 @@ public class ScriptPlugin implements Plugin {
          * @param functionName The name of the function that will handle the event
          */
         @SuppressWarnings("unused")
+        @Deprecated
         public void registerEvent(Event.Type event, Event.Priority priority, String functionName) {
             ScriptPlugin.this.server.getPluginManager().registerEvent(event, new ScriptEventListener(functionName), priority, ScriptPlugin.this);
+        }
+
+        /**
+         * Register an event, specifying the function that should handle the event
+         *
+         * @param event        The type of the event that will trigger the function
+         * @param priority     The priority of the event handler
+         * @param functionName The name of the function that will handle the event
+         */
+        @SuppressWarnings("unused")
+        public void registerEvent(Class<? extends Event> event, EventPriority priority, String functionName) {
+            ScriptPlugin.this.server.getPluginManager().registerEvent(event, new ScriptEventListener(functionName), priority, new EventExecutor() {
+                public void execute(Listener listener, Event event) {
+                    ((ScriptPlugin.ScriptEventListener) listener).onEvent(event);
+                }
+            }, ScriptPlugin.this);
         }
 
         /**
